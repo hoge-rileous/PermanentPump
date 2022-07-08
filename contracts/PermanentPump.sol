@@ -4,8 +4,6 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
-import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 
@@ -104,13 +102,9 @@ contract PermanentPump is ERC20, Ownable {
     }
 
     function addedETHToPP(uint amountETH) public view returns (uint ppMinted) {
-        uint totalEthValue = address(this).balance.add(HOGE.balanceOf(address(this)).mul(bid));
-        ppMinted = this.totalSupply().mul(amountETH).div(totalEthValue.add(amountETH));
-    }
-
-    function addedHOGEToPP(uint amountHOGE) public view returns (uint ppMinted) {
-        uint totalHOGEValue = HOGE.balanceOf(address(this)).add(address(this).balance.div(ask));
-        ppMinted = this.totalSupply().mul(amountHOGE).div(totalHOGEValue.add(amountHOGE));
+        if (totalSupply() == 0) return 1000000000000;
+        uint totalEthValue = address(this).balance.add(HOGE.balanceOf(address(this)).mul(spotPrice()));
+        ppMinted = this.totalSupply().mul(amountETH).div(totalEthValue.sub(amountETH));
     }
 
     function addETH() public payable returns (uint ppMinted) {
@@ -118,21 +112,32 @@ contract PermanentPump is ERC20, Ownable {
         _mint(_msgSender(), ppMinted);
     }
 
+    function addedHOGEToPP(uint amountHOGE) public view returns (uint ppMinted) {
+        if (totalSupply() == 0) return 1000000000000;
+        uint totalHOGEValue = HOGE.balanceOf(address(this)).add(address(this).balance.div(ask));
+        ppMinted = this.totalSupply().mul(amountHOGE).div(totalHOGEValue);
+    }
+
     function addHOGE(uint amountHOGE) public returns (uint ppMinted) {
+        ppMinted = addedHOGEToPP(amountHOGE.mul(98).div(100));
         HOGE.transferFrom(_msgSender(), address(this), amountHOGE);
-        ppMinted = addedHOGEToPP(amountHOGE);
         _mint(_msgSender(), ppMinted);
     }
 
     function getPPShareValues(uint amountPP) public view returns(uint hogeValue, uint ethValue) {
-        hogeValue = HOGE.balanceOf(address(this)).mul(amountPP).div(this.totalSupply());
-        ethValue = address(this).balance.mul(amountPP).div(this.totalSupply());
+        if (totalSupply() == 0) return (0, 0);
+        hogeValue = HOGE.balanceOf(address(this)).mul(amountPP).div(totalSupply());
+        ethValue = address(this).balance.mul(amountPP).div(totalSupply());
     }
 
     function removePP(uint amountPP) public {
         (uint hogeValue, uint ethValue) = getPPShareValues(amountPP);
-        HOGE.transfer(_msgSender(), hogeValue);
-        payable(_msgSender()).transfer(ethValue);
+        if (hogeValue > 0) {
+            HOGE.transfer(_msgSender(), hogeValue);
+        }
+        if (ethValue > 0) {
+            payable(_msgSender()).transfer(ethValue);
+        }
         _burn(_msgSender(), amountPP);
     }
 

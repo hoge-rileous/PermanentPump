@@ -107,7 +107,7 @@ contract PermanentPump is ERC20, Ownable {
         ppMinted = this.totalSupply().mul(amountETH).div(totalEthValue.sub(amountETH));
     }
 
-    function addETH() public payable returns (uint ppMinted) {
+    function addETH() public payable withinRange() returns (uint ppMinted) {
         ppMinted = addedETHToPP(msg.value);
         _mint(_msgSender(), ppMinted);
     }
@@ -118,7 +118,7 @@ contract PermanentPump is ERC20, Ownable {
         ppMinted = this.totalSupply().mul(amountHOGE).div(totalHOGEValue);
     }
 
-    function addHOGE(uint amountHOGE) public returns (uint ppMinted) {
+    function addHOGE(uint amountHOGE) public withinRange() returns (uint ppMinted) {
         ppMinted = addedHOGEToPP(amountHOGE.mul(98).div(100));
         HOGE.transferFrom(_msgSender(), address(this), amountHOGE);
         _mint(_msgSender(), ppMinted);

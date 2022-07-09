@@ -156,12 +156,15 @@ describe("PermanentPump", async (accounts) => {
     await addHOGE(0, oneETHofHOGE);
     await addHOGE(1, oneETHofHOGE);
     await addETH(0, oneETH);
-    //When 0 adds on the ETH side, it immediately skews both's exposure 
-    //effectively 1 sells some HOGE to 0.
-    // both keep same overall value.
+    // When 0 adds on the ETH side, it immediately skews both's exposure 
+    // effectively 1 sells some HOGE to 0 but both keep same overall value.
     await reportOut(1);
-    await rug(0);
-    await rug(1);
+
+    console.log("Buying");
+
+    await pp.buyToken({value:oneETH});
+
+    await reportOut(1);
 
   });
 });

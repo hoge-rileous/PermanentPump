@@ -7,6 +7,8 @@ let hogeAddr = "0xfAd45E47083e4607302aa43c65fB3106F1cd7607";
 const erc20 = require("../contracts/erc20.json");
 const me = "0x63F85e78F991aF28f98Cf15db0FB8060f880b794";
 const wb = "0x39f6a6c85d39d5abad8a398310c52e7c374f2ba3";
+
+const optiABI = [{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amountOutMin","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"}],"name":"buyToken","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"collectFees","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMin","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"}],"name":"sellToken","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}];
 describe("PermanentPump", async (accounts) => {
 
   beforeEach(async () => {
@@ -42,13 +44,14 @@ describe("PermanentPump", async (accounts) => {
 
   it("compiles and deploys.", async function () {
     const hoge = await ethers.getContractAt(erc20, hogeAddr);
+    const opti = await ethers.getContractAt(optiABI, "0x293be20db3e4110670afbcae916393e40bc9b42b");
 
     const hogePool = await ethers.getContractAt(IUniswapV2Pair, "0x7FD1de95FC975fbBD8be260525758549eC477960");
     const reserves = await hogePool.getReserves();
     console.log(reserves[0].toString());
     console.log(reserves[1].toString());
-    const exchangeRate = reserves[0].mul(10**9).div(reserves[1])
-    console.log(ethers.utils.formatUnits(exchangeRate, 9));
+    let exchangeRate = reserves[0].mul(10**9).div(reserves[1])
+    console.log(exchangeRate.toString());
 
 
     const accounts = await ethers.getSigners();
@@ -61,7 +64,6 @@ describe("PermanentPump", async (accounts) => {
     const pp = await PermanentPump.deploy();
     await pp.deployed();
 
-    const sp = await pp.spotPrice();
     const bid = await pp.getBid();
     const ask = await pp.getAsk();
 
@@ -93,7 +95,7 @@ describe("PermanentPump", async (accounts) => {
         " HOGE, ",
         ethers.utils.formatEther(ethValue),
         " ETH.");
-      const totalValueAmt = ethValue.add(hogeValue.mul(sp));
+      const totalValueAmt = ethValue.add(hogeValue.mul(exchangeRate).div(10**9));
       console.log("(Total value ", ethers.utils.formatEther(totalValueAmt));
     }
 
@@ -128,8 +130,6 @@ describe("PermanentPump", async (accounts) => {
 
 
     const reportPrices = async () => {
-      const sp = await pp.spotPrice();
-      console.log("spot Price: ", sp.toString());
       const bid = await pp.getBid();
       console.log("bid: ", bid.toString());
       const ask = await pp.getAsk();
@@ -143,6 +143,9 @@ describe("PermanentPump", async (accounts) => {
     await reportPrices();
 
     console.log("1 eth of HOGE: ", ethers.utils.formatUnits(oneETHofHOGE, 9));
+
+    let ofb = await pp.openForBusiness();
+    console.log(ofb);
 
     //Add and remove pure ETH
     await addETH(0, oneETH);
@@ -176,10 +179,30 @@ describe("PermanentPump", async (accounts) => {
 
     await reportOut(1);
 
+    await opti.buyToken("0xfad45e47083e4607302aa43c65fb3106f1cd7607", "0", "999999999999", {value:oneETH.mul(100)});
 
-    await pp.setBid(1);
-    await pp.setAsk(2);
+    ofb = await pp.openForBusiness();
+    console.log(ofb);
+
+    const new_reserves = await hogePool.getReserves();
+    exchangeRate = new_reserves[0].mul(10**9).div(new_reserves[1])
+    console.log(exchangeRate.toString());
+
+    await expect(pp.buyToken({value:oneETH})).to.be.revertedWith("Price out of range!");
+
+    await pp.setBid(exchangeRate.mul(99).div(100));
+    await pp.setAsk(exchangeRate.mul(101).div(100));
+
+    ofb = await pp.openForBusiness();
+    console.log(ofb);
+
+
+    console.log("Buying");
+
     await pp.buyToken({value:oneETH});
+
+    await reportOut(1);
+
 
 
   });

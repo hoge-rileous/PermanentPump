@@ -17,23 +17,27 @@ contract PermanentPump is ERC20, Ownable {
 
     constructor() ERC20("Hoge 2.0 Permanent Pump", "PermanentPump") {
         uint price = spotPrice();
-        bid = price - 10**9;
-        ask = price + 10**9;
+        bid = price.mul(98).div(100);
+        ask = price.mul(102).div(100);
     }
 
     function decimals() public view virtual override returns (uint8) {
         return 9;
     }
 
-    function spotPrice() public view returns (uint price) {
+    function spotPrice() internal view returns (uint price) {
         (uint ethReserves, uint hogeReserves,) = HOGEWETH.getReserves();
         price = ethReserves.mul(10**9).div(hogeReserves);
     }
 
-    modifier withinRange() {
+    function openForBusiness() public view returns (bool) {
         uint price = spotPrice();
-        require(price > bid, "Price below range!");
-        require(price < ask, "Price above range!");
+        return(price > bid.mul(95).div(100) 
+            && price < ask.mul(105).div(100));
+    }
+
+    modifier withinRange() {
+        require(openForBusiness(), "Price out of range!");
         _;
     }
 

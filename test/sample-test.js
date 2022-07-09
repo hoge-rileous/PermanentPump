@@ -1,8 +1,8 @@
 require('dotenv').config()
 const { ethers } = require("hardhat");
 const { expect } = require("chai");
-//const IUniswapV2Pair = require("../contracts/pair.json");
-
+const IUniswapV2Pair = require("../contracts/pair.json");
+//import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 let hogeAddr = "0xfAd45E47083e4607302aa43c65fB3106F1cd7607";
 const erc20 = require("../contracts/erc20.json");
 const me = "0x63F85e78F991aF28f98Cf15db0FB8060f880b794";
@@ -43,12 +43,12 @@ describe("PermanentPump", async (accounts) => {
   it("compiles and deploys.", async function () {
     const hoge = await ethers.getContractAt(erc20, hogeAddr);
 
-    //const hogePool = await ethers.getContractAt(IUniswapV2Pair, "0x7FD1de95FC975fbBD8be260525758549eC477960");
-/*    const reserves = await hogePool.getReserves();
+    const hogePool = await ethers.getContractAt(IUniswapV2Pair, "0x7FD1de95FC975fbBD8be260525758549eC477960");
+    const reserves = await hogePool.getReserves();
     console.log(reserves[0].toString());
     console.log(reserves[1].toString());
-    const exchangeRate = reserves[0].div(reserves[1])
-    console.log(ethers.utils.formatUnits(exchangeRate, 18));*/
+    const exchangeRate = reserves[0].mul(10**9).div(reserves[1])
+    console.log(ethers.utils.formatUnits(exchangeRate, 9));
 
 
     const accounts = await ethers.getSigners();
@@ -98,14 +98,14 @@ describe("PermanentPump", async (accounts) => {
     }
 
     const addETH = async (i, amt) => {
-      console.log("Account ", i, " adds ", ethers.utils.formatEther(amt), " ETH");
+      console.log("                       > Account ", i, " adds ", ethers.utils.formatEther(amt), " ETH");
       const pp_i = await pp.connect(accounts[i]);
       await pp_i.addETH({value: amt}); 
       await reportOut(i);
     }
 
     const addHOGE  = async (i, amt) => {
-      console.log("Account ", i, " adds ", ethers.utils.formatUnits(amt, 9 ), " HOGE");
+      console.log("                       > Account ", i, " adds ", ethers.utils.formatUnits(amt, 9 ), " HOGE");
       const pp_i = await pp.connect(accounts[i]);
       const hoge_i = await hoge.connect(accounts[i]);
       const appr_txn = await hoge_i.approve(pp.address, amt);
@@ -121,7 +121,7 @@ describe("PermanentPump", async (accounts) => {
     }
 
     const rug = async (i) => {
-      console.log("Rugging ", i);
+      console.log("                       > Rugging ", i);
       const ppBalance = await pp.balanceOf(accounts[i].address);
       await removePP(i, ppBalance);
     }
@@ -136,13 +136,13 @@ describe("PermanentPump", async (accounts) => {
       console.log("ask: ", ask.toString());
     }
 
+
     const oneETH = ethers.utils.parseEther("1.0");
-    const oneETHofHOGE = oneETH.div(ask);
+    const oneETHofHOGE = oneETH.mul(10**9).div(ask);
 
     await reportPrices();
 
     console.log("1 eth of HOGE: ", ethers.utils.formatUnits(oneETHofHOGE, 9));
-
 
     //Add and remove pure ETH
     await addETH(0, oneETH);
@@ -165,6 +165,22 @@ describe("PermanentPump", async (accounts) => {
     await pp.buyToken({value:oneETH});
 
     await reportOut(1);
+
+    console.log("Selling")
+
+    const pp_1 = await pp.connect(accounts[1]);
+    const hoge_1 = await hoge.connect(accounts[1]);
+    const appr_txn = await hoge_1.approve(pp_1.address, oneETHofHOGE);
+    await appr_txn.wait();
+    await pp_1.sellToken(oneETHofHOGE);
+
+    await reportOut(1);
+
+
+    await pp.setBid(1);
+    await pp.setAsk(2);
+    await pp.buyToken({value:oneETH});
+
 
   });
 });
